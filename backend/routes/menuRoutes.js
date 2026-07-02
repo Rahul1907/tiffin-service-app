@@ -6,16 +6,17 @@ import {
   updateMenuItem,
   deleteMenuItem,
 } from '../controllers/menuController.js';
+import { protect, adminOnly } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
 router.route('/')
   .get(getMenuItems)
-  .post(createMenuItem); // Admin check will be added in Phase 3
+  .post(protect, adminOnly, createMenuItem);
 
 router.route('/:id')
   .get(getMenuItemById)
-  .put(updateMenuItem) // Admin check will be added in Phase 3
-  .delete(deleteMenuItem); // Admin check will be added in Phase 3
+  .put(protect, adminOnly, updateMenuItem)
+  .delete(protect, adminOnly, deleteMenuItem);
 
 export default router;

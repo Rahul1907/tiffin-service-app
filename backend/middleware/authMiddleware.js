@@ -1,4 +1,5 @@
 import jwt from 'jsonwebtoken';
+import User from '../models/User.js';
 
 // Protect routes for logged-in users
 export const protect = async (req, res, next) => {
@@ -9,24 +10,24 @@ export const protect = async (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
       
-      // Temporarily store credentials decoded from the token.
-      // Once the User model is established, we will fetch user details from DB.
-      req.user = {
-        id: decoded.id,
-        phone: decoded.phone,
-        role: decoded.role || 'customer'
-      };
+      // Query the database for the active user details (excluding OTP codes)
+      req.user = await User.findById(decoded.id).select('-otp -otpExpires');
+      
+      if (!req.user) {
+        res.status(401);
+        return next(new Error('Not authorized: User no longer exists'));
+      }
       
       return next();
     } catch (error) {
       res.status(401);
-      return next(new Error('Not authorized: invalid token'));
+      return next(new Error('Not authorized: Invalid token'));
     }
   }
 
   if (!token) {
     res.status(401);
-    return next(new Error('Not authorized: token missing'));
+    return next(new Error('Not authorized: Token missing'));
   }
 };
 

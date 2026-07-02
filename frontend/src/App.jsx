@@ -1,12 +1,20 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Link } from 'react-router-dom';
-import { ShoppingBag, User, ChefHat } from 'lucide-react';
-import { useSelector } from 'react-redux';
+import { LogOut, Shield } from 'lucide-react';
+import { useSelector, useDispatch } from 'react-redux';
 import MenuPage from './pages/MenuPage.jsx';
+import LoginPage from './pages/LoginPage.jsx';
+import AdminDashboard from './pages/AdminDashboard.jsx';
+import ProtectedRoute from './components/ProtectedRoute.jsx';
+import { logout } from './store/slices/authSlice.js';
 
 function App() {
-  const cartItems = useSelector((state) => state.cart.items);
-  const cartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+  const dispatch = useDispatch();
+  const { isAuthenticated, user } = useSelector((state) => state.auth);
+
+  const handleLogout = () => {
+    dispatch(logout());
+  };
 
   return (
     <Router>
@@ -15,25 +23,48 @@ function App() {
         <header className="sticky top-0 z-50 glassmorphism shadow-sm">
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex items-center justify-between h-16">
-              <div className="flex items-center">
+              <div className="flex items-center space-x-6">
                 <Link to="/" className="flex items-center space-x-2 text-xl font-bold text-amber-600">
                   <span className="text-2xl">🍱</span>
                   <span>TiffinExpress</span>
                 </Link>
+                <Link to="/" className="text-slate-600 hover:text-amber-600 transition-colors font-bold text-sm">Menu</Link>
               </div>
               <nav className="flex space-x-4 items-center">
-                <Link to="/" className="text-slate-600 hover:text-amber-600 transition-colors font-medium">Menu</Link>
-                <Link to="/cart" className="relative p-2 text-slate-600 hover:text-amber-600 transition-colors">
-                  <ShoppingBag size={22} />
-                  {cartCount > 0 && (
-                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold rounded-full w-5 h-5 flex items-center justify-center animate-pulse">
-                      {cartCount}
-                    </span>
-                  )}
-                </Link>
-                <Link to="/login" className="p-2 text-slate-600 hover:text-amber-600 transition-colors">
-                  <User size={22} />
-                </Link>
+                {/* Admin Dashboard Link */}
+                {isAuthenticated && user?.role === 'admin' && (
+                  <Link 
+                    to="/admin" 
+                    className="text-amber-600 hover:text-amber-700 transition-colors font-bold text-xs bg-amber-50 px-3.5 py-2 rounded-xl border border-amber-200"
+                  >
+                    Dashboard
+                  </Link>
+                )}
+
+                {/* Profile Pill & Logout */}
+                {isAuthenticated && (
+                  <div className="flex items-center space-x-3 pl-2 border-l border-slate-200">
+                    <div className="flex flex-col text-right">
+                      <span className="text-xs font-bold text-slate-800 truncate max-w-[120px]">
+                        {user?.name || user?.phone || user?.email}
+                      </span>
+                      {user?.role === 'admin' && (
+                        <span className="text-[10px] text-amber-600 font-extrabold flex items-center justify-end">
+                          <Shield size={10} className="mr-0.5" />
+                          Admin
+                        </span>
+                      )}
+                    </div>
+                    
+                    <button
+                      onClick={handleLogout}
+                      className="p-2 text-slate-500 hover:text-red-600 hover:bg-red-50 rounded-xl transition-all"
+                      title="Log Out"
+                    >
+                      <LogOut size={18} />
+                    </button>
+                  </div>
+                )}
               </nav>
             </div>
           </div>
@@ -43,8 +74,15 @@ function App() {
         <main className="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
           <Routes>
             <Route path="/" element={<MenuPage />} />
-            <Route path="/cart" element={<div className="text-center py-12 text-slate-600">Cart Page (Phase 4)</div>} />
-            <Route path="/login" element={<div className="text-center py-12 text-slate-600">Login Page (Phase 3)</div>} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route 
+              path="/admin" 
+              element={
+                <ProtectedRoute adminOnly={true}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              } 
+            />
           </Routes>
         </main>
 

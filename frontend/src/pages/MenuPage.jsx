@@ -1,36 +1,38 @@
 import React, { useEffect, useState } from 'react';
-import { useDispatch, useSelector } from 'react-redux';
-import { ChefHat, ShoppingBag, Flame, Sparkles } from 'lucide-react';
+import { ChefHat, Flame, Sparkles } from 'lucide-react';
 import API from '../api/client.js';
-import { addToCart } from '../store/slices/cartSlice.js';
 
 function MenuPage() {
-  const dispatch = useDispatch();
   const [menuItems, setMenuItems] = useState([]);
+  const [pincodes, setPincodes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   
   // Filtering state
   const [categoryFilter, setCategoryFilter] = useState('all'); // 'all', 'lunch', 'dinner'
   const [dietFilter, setDietFilter] = useState('all'); // 'all', 'veg', 'non-veg'
-  
-  // Toast notifications state
-  const [toastMessage, setToastMessage] = useState('');
-  const [showToast, setShowToast] = useState(false);
 
   useEffect(() => {
-    fetchMenu();
+    fetchData();
   }, []);
 
-  const fetchMenu = async () => {
+  const fetchData = async () => {
     try {
       setLoading(true);
       setError('');
-      const response = await API.get('/menu');
-      if (response.data && response.data.success) {
-        setMenuItems(response.data.data);
-      } else {
-        setError('Failed to fetch menu items.');
+      
+      // Load menu items and active pincodes concurrently
+      const [menuRes, pinRes] = await Promise.all([
+        API.get('/menu'),
+        API.get('/pincodes')
+      ]);
+
+      if (menuRes.data && menuRes.data.success) {
+        setMenuItems(menuRes.data.data);
+      }
+      
+      if (pinRes.data && pinRes.data.success) {
+        setPincodes(pinRes.data.data);
       }
     } catch (err) {
       console.error(err);
@@ -41,13 +43,6 @@ function MenuPage() {
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleAddToCart = (item) => {
-    dispatch(addToCart({ item, quantity: 1 }));
-    setToastMessage(`🍱 Added ${item.name} to cart!`);
-    setShowToast(true);
-    setTimeout(() => setShowToast(false), 3000);
   };
 
   // Filter items in memory
@@ -67,14 +62,6 @@ function MenuPage() {
 
   return (
     <div className="relative pb-16">
-      {/* Toast Notification */}
-      {showToast && (
-        <div className="fixed bottom-5 right-5 z-50 flex items-center bg-slate-900 text-white px-5 py-3 rounded-xl shadow-2xl animate-bounce border border-amber-500">
-          <Sparkles className="text-amber-400 mr-2" size={18} />
-          <span className="font-semibold text-sm">{toastMessage}</span>
-        </div>
-      )}
-
       {/* Hero Banner Section */}
       <div className="relative overflow-hidden rounded-3xl bg-gradient-to-r from-amber-500 to-orange-600 text-white px-8 py-12 md:p-16 shadow-lg mb-12">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_30%,rgba(255,255,255,0.1),transparent)]" />
@@ -90,7 +77,7 @@ function MenuPage() {
             Hygienic, nutrient-dense home-cooked meals prepared with love by mom. Bringing the flavor of authentic local spices straight to your doorstep.
           </p>
         </div>
-        <div className="hidden lg:block absolute right-16 top-1/2 -translate-y-1/2 text-[120px] opacity-25 select-none">
+        <div className="hidden lg:block absolute right-16 top-1/2 -translate-y-1/2 text-[120px] opacity-25 select-none font-sans">
           🍱
         </div>
       </div>
@@ -148,7 +135,7 @@ function MenuPage() {
           <h3 className="font-bold text-lg">Unable to Load Menu</h3>
           <p className="text-sm mt-1">{error}</p>
           <button 
-            onClick={fetchMenu} 
+            onClick={fetchData} 
             className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-xl text-sm font-bold transition-all shadow-md"
           >
             Retry Connection
@@ -180,7 +167,7 @@ function MenuPage() {
                 
                 {/* Veg/Non-Veg Tag */}
                 <span className={`absolute top-4 left-4 inline-flex items-center px-3 py-1 rounded-full text-xs font-extrabold shadow-sm ${
-                  item.isVeg ? 'bg-emerald-550 text-emerald-800 bg-emerald-50 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
+                  item.isVeg ? 'bg-emerald-50 text-emerald-800 border border-emerald-200' : 'bg-red-50 text-red-800 border border-red-200'
                 }`}>
                   <span className={`w-2 h-2 rounded-full mr-1.5 ${item.isVeg ? 'bg-emerald-500' : 'bg-red-500'}`} />
                   {item.isVeg ? 'VEG' : 'NON-VEG'}
@@ -195,7 +182,7 @@ function MenuPage() {
               {/* Product Info */}
               <div className="p-6 flex flex-col flex-grow">
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-xl font-bold text-slate-900 group-hover:text-amber-600 transition-colors">
+                  <h3 className="text-xl font-bold text-slate-900 transition-colors">
                     {item.name}
                   </h3>
                 </div>
@@ -203,7 +190,7 @@ function MenuPage() {
                   {item.description}
                 </p>
 
-                {/* Pricing & Add to Cart action */}
+                {/* Pricing & Availability status */}
                 <div className="flex items-center justify-between mt-auto pt-4 border-t border-slate-50">
                   <div>
                     <span className="text-xs text-slate-400 font-bold block uppercase tracking-wider">Price</span>
@@ -211,22 +198,42 @@ function MenuPage() {
                   </div>
                   
                   {item.isAvailableToday ? (
-                    <button
-                      onClick={() => handleAddToCart(item)}
-                      className="inline-flex items-center space-x-2 bg-amber-500 hover:bg-amber-600 active:bg-amber-700 text-white px-5 py-3 rounded-2xl text-sm font-bold shadow-md hover:shadow-lg transition-all"
-                    >
-                      <ShoppingBag size={16} />
-                      <span>Add to Cart</span>
-                    </button>
+                    <span className="inline-flex items-center space-x-1.5 bg-emerald-50 text-emerald-700 border border-emerald-100 px-3.5 py-2 rounded-2xl text-xs font-extrabold tracking-wide uppercase">
+                      <span className="w-1.5 h-1.5 bg-emerald-500 rounded-full animate-ping" />
+                      <span>Available</span>
+                    </span>
                   ) : (
-                    <span className="inline-block bg-slate-100 text-slate-400 px-4 py-2.5 rounded-2xl text-sm font-bold border border-slate-200 cursor-not-allowed">
-                      Sold Out
+                    <span className="inline-flex items-center bg-slate-55/60 text-slate-400 border border-slate-200 px-3.5 py-2 rounded-2xl text-xs font-extrabold tracking-wide uppercase">
+                      <span>Sold Out</span>
                     </span>
                   )}
                 </div>
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* Served Areas Section */}
+      {!loading && !error && (
+        <div className="mt-20 bg-amber-500/5 rounded-3xl border border-amber-500/10 p-8 md:p-12 text-center max-w-4xl mx-auto">
+          <ChefHat size={36} className="mx-auto text-amber-500 mb-3" />
+          <h2 className="text-2xl font-bold text-slate-900">Served Delivery Areas</h2>
+          <p className="mt-2 text-slate-600 text-sm max-w-lg mx-auto leading-relaxed">
+            We deliver fresh, hot home-style meals to the following locations in Ahmedabad. Select your thali and call us to place your order!
+          </p>
+          
+          {pincodes.length > 0 ? (
+            <div className="mt-6 flex flex-wrap justify-center gap-3">
+              {pincodes.map((pin) => (
+                <div key={pin._id} className="bg-white px-4 py-2.5 rounded-2xl border border-slate-100 shadow-sm text-sm font-bold text-slate-700">
+                  📍 <span className="text-slate-800">{pin.code}</span> - <span className="text-slate-500 font-semibold">{pin.areaName}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-4 text-slate-400 text-sm italic">Served delivery areas list will be populated soon. Contact us to verify delivery to your area.</p>
+          )}
         </div>
       )}
     </div>
