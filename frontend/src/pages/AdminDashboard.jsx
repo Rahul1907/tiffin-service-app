@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { ChefHat, Plus, Edit2, Trash2, Power, Eye, EyeOff, MapPin, Sparkles, X, ToggleLeft, ToggleRight } from 'lucide-react';
+import { ChefHat, Plus, Edit2, Trash2, MapPin, Sparkles, X, Star, MessageSquare } from 'lucide-react';
 import API from '../api/client.js';
 
 function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState('menu'); // 'menu' or 'pincodes'
+  const [activeTab, setActiveTab] = useState('menu'); // 'menu', 'pincodes', 'reviews'
   
   // Data states
   const [menuItems, setMenuItems] = useState([]);
   const [pincodes, setPincodes] = useState([]);
+  const [reviewsList, setReviewsList] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -32,6 +33,7 @@ function AdminDashboard() {
   useEffect(() => {
     fetchMenuItems();
     fetchPincodes();
+    fetchReviews();
   }, []);
 
   const fetchMenuItems = async () => {
@@ -54,6 +56,17 @@ function AdminDashboard() {
       const res = await API.get('/pincodes');
       if (res.data && res.data.success) {
         setPincodes(res.data.data);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchReviews = async () => {
+    try {
+      const res = await API.get('/reviews');
+      if (res.data && res.data.success) {
+        setReviewsList(res.data.data);
       }
     } catch (err) {
       console.error(err);
@@ -113,13 +126,11 @@ function AdminDashboard() {
       setLoading(true);
       let response;
       if (editingItemId) {
-        // Edit mode
         response = await API.put(`/menu/${editingItemId}`, payload);
         if (response.data && response.data.success) {
           setSuccess(`Successfully updated "${name}"!`);
         }
       } else {
-        // Add mode
         response = await API.post('/menu', payload);
         if (response.data && response.data.success) {
           setSuccess(`Successfully added "${name}" to the menu!`);
@@ -226,6 +237,26 @@ function AdminDashboard() {
     }
   };
 
+  // Delete Customer Review
+  const handleDeleteReview = async (id, reviewerName) => {
+    if (!window.confirm(`Are you sure you want to delete feedback from "${reviewerName}"?`)) return;
+    setError('');
+    setSuccess('');
+    try {
+      setLoading(true);
+      const res = await API.delete(`/reviews/${id}`);
+      if (res.data && res.data.success) {
+        setSuccess(`Feedback from "${reviewerName}" deleted successfully.`);
+        fetchReviews();
+      }
+    } catch (err) {
+      console.error(err);
+      setError('Failed to delete review.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="max-w-6xl mx-auto px-4 py-8">
       {/* Header Info */}
@@ -241,10 +272,10 @@ function AdminDashboard() {
         </div>
 
         {/* Tab Controls */}
-        <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200">
+        <div className="flex bg-slate-100 p-1.5 rounded-2xl border border-slate-200 w-full md:w-auto overflow-x-auto">
           <button
             onClick={() => setActiveTab('menu')}
-            className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
+            className={`px-5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
               activeTab === 'menu' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-950'
             }`}
           >
@@ -252,11 +283,19 @@ function AdminDashboard() {
           </button>
           <button
             onClick={() => setActiveTab('pincodes')}
-            className={`px-6 py-2.5 rounded-xl text-sm font-bold transition-all ${
+            className={`px-5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
               activeTab === 'pincodes' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-950'
             }`}
           >
             Serviced Pincodes
+          </button>
+          <button
+            onClick={() => setActiveTab('reviews')}
+            className={`px-5 py-2 rounded-xl text-xs font-bold transition-all whitespace-nowrap ${
+              activeTab === 'reviews' ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-950'
+            }`}
+          >
+            Customer Reviews
           </button>
         </div>
       </div>
@@ -458,6 +497,67 @@ function AdminDashboard() {
         </div>
       )}
 
+      {/* TAB 3: Reviews Management */}
+      {activeTab === 'reviews' && (
+        <div className="bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
+          <h3 className="text-lg font-bold text-slate-900 mb-6 flex items-center space-x-2">
+            <MessageSquare size={20} className="text-amber-500" />
+            <span>Customer Testimonials & Reviews</span>
+          </h3>
+
+          {reviewsList.length === 0 ? (
+            <div className="text-center py-16 border-2 border-dashed border-slate-200 rounded-3xl">
+              <p className="text-slate-450 text-sm font-medium">No reviews submitted by customers yet.</p>
+              <p className="text-slate-400 text-xs mt-1">Submit feedback from the homepage to see them here.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {reviewsList.map((rev) => (
+                <div
+                  key={rev._id}
+                  className="bg-slate-50/50 border border-slate-100 p-5 rounded-2xl flex flex-col justify-between hover:shadow-sm transition-all"
+                >
+                  <div>
+                    {/* Header: Stars & delete */}
+                    <div className="flex items-center justify-between mb-3">
+                      <div className="flex space-x-1">
+                        {[...Array(rev.rating)].map((_, i) => (
+                          <Star key={i} size={14} className="fill-amber-500 text-amber-500" />
+                        ))}
+                      </div>
+                      <button
+                        onClick={() => handleDeleteReview(rev._id, rev.name)}
+                        className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                        title="Delete Feedback"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+
+                    <p className="text-slate-700 text-sm italic mb-4 leading-relaxed">
+                      "{rev.comment}"
+                    </p>
+                  </div>
+
+                  <div className="pt-3 border-t border-slate-100 flex items-center justify-between mt-auto">
+                    <div>
+                      <h4 className="font-extrabold text-slate-800 text-xs">{rev.name}</h4>
+                      <p className="text-[9px] text-slate-450 font-bold uppercase tracking-wider">{rev.role} • {rev.location}</p>
+                    </div>
+                    <span className="text-[10px] text-slate-400 font-semibold">
+                      {new Date(rev.createdAt).toLocaleDateString(undefined, {
+                        month: 'short',
+                        day: 'numeric',
+                      })}
+                    </span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* MODAL: Add / Edit Menu Item */}
       {showItemModal && (
         <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
@@ -535,9 +635,9 @@ function AdminDashboard() {
                     className="focus:outline-none"
                   >
                     {isVeg ? (
-                      <span className="text-xs font-extrabold text-emerald-600 bg-emerald-55/60 px-3 py-1.5 rounded-xl border border-emerald-200">🟢 Veg Only</span>
+                      <span className="text-xs font-extrabold text-emerald-600 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-250">🟢 Veg Only</span>
                     ) : (
-                      <span className="text-xs font-extrabold text-red-600 bg-red-55/60 px-3 py-1.5 rounded-xl border border-red-200">🔴 Non-Veg</span>
+                      <span className="text-xs font-extrabold text-red-650 bg-red-50 px-3 py-1.5 rounded-xl border border-red-200">🔴 Non-Veg</span>
                     )}
                   </button>
                 </div>
@@ -549,7 +649,7 @@ function AdminDashboard() {
                     className="focus:outline-none"
                   >
                     {isAvailableToday ? (
-                      <span className="text-xs font-extrabold text-emerald-650 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100">Yes</span>
+                      <span className="text-xs font-extrabold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-xl border border-emerald-100">Yes</span>
                     ) : (
                       <span className="text-xs font-extrabold text-slate-500 bg-slate-100 px-3 py-1.5 rounded-xl border border-slate-200">No</span>
                     )}
@@ -563,7 +663,7 @@ function AdminDashboard() {
                   type="text"
                   value={imageUrl}
                   onChange={(e) => setImageUrl(e.target.value)}
-                  placeholder="Leave blank for a default food placeholder link"
+                  placeholder="Leave blank for a default placeholder image"
                   className="block w-full px-4 py-3 border border-slate-200 rounded-xl text-sm font-semibold placeholder-slate-400 text-slate-800 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-transparent transition-all"
                 />
               </div>
